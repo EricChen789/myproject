@@ -277,7 +277,7 @@ function toast(m,t){const e=document.getElementById('toast');e.textContent=m;e.c
 
 // ========== STATS & WF ==========
 async function loadStats(){try{const r=await fetch('/api/stats'),d=await r.json();document.getElementById('sc').textContent=d.calls_today||0;document.getElementById('st').textContent=(d.total_tokens||0).toLocaleString()}catch(e){}}
-async function loadWf(){try{const r=await fetch('/api/workflows'),w=await r.json();document.getElementById('wfg').innerHTML=w.map(wf=>{const secMap={chat:{section:'chat',label:'AI 对话'}};const target=secMap[wf.name];return \`<div class="wfc \${wf.web_ready?'web-ready':''}" onclick="\${target?'st(\\'\'+target.section+'\\')':'toast(\\'本地工作流：python run.py '+wf.name+'\\')'}" style="\${target?'cursor:pointer':''}"><div class="wfi">\${wf.display_name.slice(0,2)}</div><div class="wft"><h3>\${wf.display_name}</h3><p>\${wf.description}</p>\${wf.web_ready?'<span class="tag web">🌐 Web · 点此使用</span>':'<span class="tag service">💻 本地</span>'}<span class="tag \${wf.category}">\${wf.category}</span></div></div>\`}).join('')}catch(e){}}
+async function loadWf(){try{const r=await fetch('/api/workflows'),w=await r.json();document.getElementById('wfg').innerHTML=w.map(wf=>{const secMap={chat:{section:'chat',label:'AI 对话'},'deepseek-qa':{section:'chat',label:'AI 对话'},'audio-full':{section:'voice',label:'语音处理'},'audio-translate':{section:'voice',label:'语音处理'},'clipboard-ocr':{section:'vision',label:'图片识别'}};const target=secMap[wf.name];return \`<div class="wfc \${wf.web_ready?'web-ready':''}" onclick="\${target?'st(\\'\'+target.section+'\\')':'toast(\\'本地工作流：python run.py '+wf.name+'\\')'}" style="\${target?'cursor:pointer':''}"><div class="wfi">\${wf.display_name.slice(0,2)}</div><div class="wft"><h3>\${wf.display_name}</h3><p>\${wf.description}</p>\${wf.web_ready?'<span class="tag web">🌐 Web · 点此使用</span>':'<span class="tag service">💻 本地</span>'}<span class="tag \${wf.category}">\${wf.category}</span></div></div>\`}).join('')}catch(e){}}
 
 // ========== CHAT ==========
 async function sendChat(){const i=document.getElementById('chatIn'),t=i.value.trim();if(!t)return;const m=document.getElementById('chatMsgs'),b=document.getElementById('chatBtn');m.appendChild(me('user',t));i.value='';m.scrollTop=m.scrollHeight;b.disabled=true;b.textContent='...';const ld=me('bot','<span class="spinner"></span>');m.appendChild(ld);try{const r=await fetch('/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'deepseek-chat',messages:[{role:'user',content:t}]})}),d=await r.json();ld.remove();m.appendChild(me('bot',d.choices[0].message.content));loadStats()}catch(e){ld.remove();m.appendChild(me('sys','❌ '+e.message))}b.disabled=false;b.textContent='发送';m.scrollTop=m.scrollHeight}
@@ -408,6 +408,18 @@ loadStats();loadWf();setInterval(loadStats,30000);
 </html>`;
 
 // ============================================================
+// HELPERS
+// ============================================================
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const chunks = [];
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    chunks.push(String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)));
+  }
+  return btoa(chunks.join(''));
+}
+
+// ============================================================
 // WORKER
 // ============================================================
 export default {
@@ -461,10 +473,11 @@ export default {
             web_ready: ["deepseek-qa"].includes(w.name) || w.category === "ai"
           }));
         }
-        // 自定义 web_ready 标记
+        // 确保 Web 可用工作流正确标记
+        const webReadyNames = ["audio-full", "audio-translate", "clipboard-ocr", "deepseek-qa"];
         workflows = workflows.map(w => ({
           ...w,
-          web_ready: w.name === "deepseek-qa"
+          web_ready: webReadyNames.includes(w.name)
         }));
         return new Response(JSON.stringify(workflows), {
           headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
@@ -483,13 +496,13 @@ export default {
           return new Response(JSON.stringify({ error: "请上传音频文件" }), { status: 400 });
         }
 
-        // 限制 25MB
-        if (file.size > 50 * 1024 * 1024) {
-          return new Response(JSON.stringify({ error: "文件太大（最大 50MB）" }), { status: 400 });
+        // 限制 100MB（免费计划上限）
+        if (file.size > 100 * 1024 * 1024) {
+          return new Response(JSON.stringify({ error: "文件太大（最大 100MB）" }), { status: 400 });
         }
 
         const arrayBuffer = await file.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        const base64 = arrayBufferToBase64(arrayBuffer);
         const ext = (file.name.split('.').pop() || 'ogg').toLowerCase();
         const mimeMap = { ogg: 'audio/ogg', mp3: 'audio/mpeg', mpeg: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4', opus: 'audio/ogg', oga: 'audio/ogg' };
         const mime = mimeMap[ext] || 'audio/ogg';
@@ -550,12 +563,12 @@ export default {
           return new Response(JSON.stringify({ error: "请上传图片文件" }), { status: 400 });
         }
 
-        if (file.size > 10 * 1024 * 1024) {
-          return new Response(JSON.stringify({ error: "文件太大（最大 10MB）" }), { status: 400 });
+        if (file.size > 50 * 1024 * 1024) {
+          return new Response(JSON.stringify({ error: "文件太大（最大 50MB）" }), { status: 400 });
         }
 
         const arrayBuffer = await file.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        const base64 = arrayBufferToBase64(arrayBuffer);
         const ext = (file.name.split('.').pop() || 'png').toLowerCase();
         const mimeMap = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', bmp: 'image/bmp' };
         const mime = mimeMap[ext] || 'image/jpeg';
