@@ -231,7 +231,8 @@ nav{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
     </div>
 
     <div class="result-panel" id="imgResult">
-      <div class="result-row r1"><div class="result-label">📸 识别结果</div><div class="result-text" id="ir1" style="white-space:pre-wrap"></div></div>
+      <div class="result-row r2"><div class="result-label">🔍 千问描述</div><div class="result-text" id="ir1" style="white-space:pre-wrap;font-size:12px;color:var(--dim)"></div></div>
+      <div class="result-row r1"><div class="result-label">🧠 DeepSeek</div><div class="result-text" id="ir2" style="white-space:pre-wrap"></div></div>
       <button class="btn btn-outline btn-sm" onclick="resetImage()" style="margin-top:8px">🔄 重新上传</button>
     </div>
     <p id="imgError" style="display:none;color:var(--red);margin-top:12px;font-size:13px"></p>
@@ -276,7 +277,7 @@ function toast(m,t){const e=document.getElementById('toast');e.textContent=m;e.c
 
 // ========== STATS & WF ==========
 async function loadStats(){try{const r=await fetch('/api/stats'),d=await r.json();document.getElementById('sc').textContent=d.calls_today||0;document.getElementById('st').textContent=(d.total_tokens||0).toLocaleString()}catch(e){}}
-async function loadWf(){try{const r=await fetch('/api/workflows'),w=await r.json();document.getElementById('wfg').innerHTML=w.map(wf=>\`<div class="wfc \${wf.web_ready?'web-ready':''}" onclick="\${wf.web_ready?'st(\\'\'+wf.name+'\\')':'toast(\\'本地工作流：python run.py '+wf.name+'\\')'}"><div class="wfi">\${wf.display_name.slice(0,2)}</div><div class="wft"><h3>\${wf.display_name}</h3><p>\${wf.description}</p>\${wf.web_ready?'<span class="tag web">🌐 Web</span>':'<span class="tag service">💻 本地</span>'}<span class="tag \${wf.category}">\${wf.category}</span></div></div>\`).join('')}catch(e){}}
+async function loadWf(){try{const r=await fetch('/api/workflows'),w=await r.json();document.getElementById('wfg').innerHTML=w.map(wf=>{const secMap={chat:{section:'chat',label:'AI 对话'}};const target=secMap[wf.name];return \`<div class="wfc \${wf.web_ready?'web-ready':''}" onclick="\${target?'st(\\'\'+target.section+'\\')':'toast(\\'本地工作流：python run.py '+wf.name+'\\')'}" style="\${target?'cursor:pointer':''}"><div class="wfi">\${wf.display_name.slice(0,2)}</div><div class="wft"><h3>\${wf.display_name}</h3><p>\${wf.description}</p>\${wf.web_ready?'<span class="tag web">🌐 Web · 点此使用</span>':'<span class="tag service">💻 本地</span>'}<span class="tag \${wf.category}">\${wf.category}</span></div></div>\`}).join('')}catch(e){}}
 
 // ========== CHAT ==========
 async function sendChat(){const i=document.getElementById('chatIn'),t=i.value.trim();if(!t)return;const m=document.getElementById('chatMsgs'),b=document.getElementById('chatBtn');m.appendChild(me('user',t));i.value='';m.scrollTop=m.scrollHeight;b.disabled=true;b.textContent='...';const ld=me('bot','<span class="spinner"></span>');m.appendChild(ld);try{const r=await fetch('/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'deepseek-chat',messages:[{role:'user',content:t}]})}),d=await r.json();ld.remove();m.appendChild(me('bot',d.choices[0].message.content));loadStats()}catch(e){ld.remove();m.appendChild(me('sys','❌ '+e.message))}b.disabled=false;b.textContent='发送';m.scrollTop=m.scrollHeight}
@@ -363,6 +364,7 @@ async function handleImage(file){
     if(d.error)throw new Error(d.error);
 
     document.getElementById('ir1').textContent=d.description;
+    document.getElementById('ir2').textContent=d.answer;
     document.getElementById('imgProgress').style.display='none';
     document.getElementById('imgResult').classList.add('show');
     loadStats();
@@ -583,8 +585,26 @@ export default {
         }
 
         const description = qwenData.choices?.[0]?.message?.content || "";
-        const usage = qwenData.usage || {};
-        const totalTokens = (usage.prompt_tokens || 0) + (usage.completion_tokens || 0);
+        let qwenTokens = 0;
+        if (qwenData.usage) { qwenTokens = (qwenData.usage.prompt_tokens || 0) + (qwenData.usage.completion_tokens || 0); }
+
+        // DeepSeek 综合回答
+        const dsResp = await fetch("https://api.deepseek.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${DEEPSEEK_KEY}` },
+          body: JSON.stringify({
+            model: "deepseek-chat",
+            messages: [
+              { role: "system", content: "你是 AI 助手。用户上传了一张图片，千问已给出详细描述。请基于描述给用户一个清晰、有条理的最终回答。不要遗漏重要信息。" },
+              { role: "user", content: `【千问对该图片的详细描述】\n${description}\n\n请基于以上描述，给我一个完整清晰的回答。` }
+            ]
+          })
+        });
+        const dsData = await dsResp.json();
+        const answer = dsData.choices?.[0]?.message?.content || "";
+        let dsTokens = 0;
+        if (dsData.usage) { dsTokens = (dsData.usage.prompt_tokens || 0) + (dsData.usage.completion_tokens || 0); }
+        const totalTokens = qwenTokens + dsTokens;
 
         // 记录到 D1
         if (env.myproject_db) {
@@ -592,10 +612,10 @@ export default {
           const ua = (request.headers.get("user-agent") || "").slice(0, 200);
           await env.myproject_db.prepare(
             "INSERT INTO usage_logs (type, model, prompt_tokens, completion_tokens, total_tokens, ip, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)"
-          ).bind("vision", "qwen-vl-max", usage.prompt_tokens || 0, usage.completion_tokens || 0, totalTokens, ip, ua).run();
+          ).bind("vision", "qwen-vl-max + deepseek-chat", qwenTokens + dsTokens, 0, totalTokens, ip, ua).run();
         }
 
-        return new Response(JSON.stringify({ description, tokens: totalTokens }), {
+        return new Response(JSON.stringify({ description, answer, tokens: totalTokens }), {
           headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
         });
       } catch (e) {
