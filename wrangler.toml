@@ -1,0 +1,6 @@
+name = "twilight-sun-e930"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+# 默认路由：workers.dev 子域名
+workers_dev = true

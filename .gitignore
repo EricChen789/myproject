@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 环境变量（含 API Key）
+.env
+
+# Node
+node_modules/
+.wrangler/
+
+# 用户数据（音频、截图）
+captures/
+mp3/
+
+# 旧 WhatsApp Bot (已废弃) — session 缓存
+whatsapp-session/
+.wwebjs_cache/
+
+# WUZAPI 数据库
+wuzapi/dbdata/
+
+# Claude Code 本地配置
+.claude/settings.local.json
+
+# 测试区
+test1/
+
+# 临时文件
+*.tmp
+*.temp

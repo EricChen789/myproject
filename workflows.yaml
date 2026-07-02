@@ -1,0 +1,204 @@
+# myproject 工作流配置
+# 添加新流程：在 workflows 下加一个条目即可，无需写 Python 脚本
+# 运行：python run.py              → 交互菜单
+#       python run.py <流程名>     → 直接执行
+
+version: 1
+
+workflows:
+
+  # ===== 语音转书面语 =====
+  audio-translate:
+    name: "🎤 语音转书面语"
+    description: "粤语语音 → 千问识别 → DeepSeek 转书面语"
+    steps:
+      - action: select_file
+        output_as: audio_path
+        dir: D:/myproject/mp3
+        pattern: "*.ogg,*.mp3,*.wav,*.m4a,*.mpeg,*.opus,*.oga"
+        latest: true
+        message: "📂 自动选择最新文件"
+
+      - action: qwen_audio
+        output_as: cantonese_text
+        audio: "{{audio_path}}"
+        prompt: "请一字不漏地将这段粤语语音转换为文本，使用繁体中文（繁體字），保留原汁原味的粤语口语字如 咩、唔、係、佢、乜、冇、嘅、啲、喺、嗰 等。"
+
+      - action: deepseek_chat
+        model: deepseek-v4-pro
+        system: "你是一个精通粤语的书面语转换专家。请将输入的粤语口语（白话）转换为标准粤语书面语（繁體中文書面語），例如：'佢尋日同我講咩' → '他昨日和我說了什麼'。全部使用繁體字输出。不要输出任何多余的解释，直接给出书面语结果。"
+        prompt: "{{cantonese_text}}"
+
+      - action: print
+        template: |
+          ==================================================
+          🎤 粤语原文：{{cantonese_text}}
+          📝 粤语书面语：{{prev_output}}
+          ==================================================
+
+  # ===== 剪贴板识别 =====
+  clipboard-ocr:
+    name: "📸 剪贴板截图识别"
+    description: "捕获剪贴板图片 → 千问视觉识别"
+    steps:
+      - action: capture_clipboard
+        output_as: image_path
+        save_dir: D:/myproject/captures
+
+      - action: qwen_vision
+        output_as: description
+        image: "{{image_path}}"
+        prompt: "请详细描述这张图片的内容，包括所有文字、界面元素、颜色、布局等细节，不要遗漏任何信息。"
+
+      - action: print
+        template: |
+          ✅ 千问识别结果：
+          {{description}}
+
+  # ===== DeepSeek 主控问答（function calling → 自动调千问看图）=====
+  deepseek-qa:
+    name: "🤖 DeepSeek 主控问答"
+    description: "DeepSeek 做主脑，提及图片路径自动调千问看图"
+    args:
+      - name: question
+        prompt: "💬 输入你的问题（提及图片路径会触发千问看图）"
+    steps:
+      - action: deepseek_agent
+        model: deepseek-v4-pro
+        system: "你是一个全能的AI助手（由 DeepSeek 驱动）。你可以使用工具调动通义千问来帮你'看图'。如果用户给出了图片路径或者提到了看图，请务必调用 qwen_analyze_image 工具，拿到千问的详细描述后，再结合你的强大逻辑回答用户。"
+        prompt: "{{args.question}}"
+        tools:
+          - name: qwen_analyze_image
+            description: "当用户提到图片、截图、或者需要分析某个图片文件时，调用此函数让通义千问帮你极其详细地识别图片内容。"
+            action: qwen_vision
+            params:
+              image_path:
+                type: string
+                description: "图片的本地路径，例如 image.png"
+            prompt: "请扮演一个视觉大师，仔细观察这张图片，并告诉我们你看到的所有东西。要求：尽可能详细地描述，包括但不限于所有的文字（特别是代码、报错信息）、界面布局、颜色、甚至各种微小的细节，不要漏掉任何蛛丝马迹。"
+
+  # ===== 语音完整处理：转写 → 书面语 → 英译 → 朗读 =====
+  audio-full:
+    name: "🎤 语音完整处理（转写→书面→英译→朗读）"
+    description: "千问听语音 → 粤语原文 → DeepSeek 转书面语 → 英译 → 英语朗读"
+    steps:
+      - action: select_file
+        output_as: audio_path
+        dir: D:/myproject/mp3
+        pattern: "*.ogg,*.mp3,*.wav,*.m4a,*.mpeg,*.opus,*.oga"
+        latest: true
+        message: "📂 自动选择最新文件"
+
+      - action: qwen_audio
+        output_as: original_text
+        audio: "{{audio_path}}"
+        prompt: "请一字不漏地将这段粤语语音转换为文本，使用繁体中文（繁體字），保留原汁原味的粤语口语字如 咩、唔、係、佢、乜、冇、嘅、啲、喺、嗰 等。"
+
+      - action: deepseek_chat
+        output_as: written_cn
+        model: deepseek-v4-pro
+        system: "你是一个精通粤语的书面语转换专家。请将输入的粤语口语（白话）转换为标准粤语书面语（繁體中文書面語），例如：'佢尋日同我講咩' → '他昨日和我說了什麼'。全部使用繁體字输出。不要输出任何多余的解释，直接给出书面语结果。"
+        prompt: "{{original_text}}"
+
+      - action: deepseek_chat
+        output_as: english
+        model: deepseek-v4-pro
+        system: "You are a professional translator. Translate the following Chinese text into natural, fluent English. Only output the English translation, nothing else."
+        prompt: "{{written_cn}}"
+
+      - action: print
+        template: |
+          ==================================================
+          🎤 粤语原文：{{original_text}}
+          📝 粤语书面语：{{written_cn}}
+          🌐 英文翻译：{{english}}
+          ==================================================
+
+      - action: tts_speak
+        text: "{{english}}"
+        voice: "en-US-JennyNeural"
+
+  # ===== 部署 Worker =====
+  deploy-worker:
+    name: "🚀 部署 Cloudflare Worker"
+    description: "运行 npx wrangler deploy"
+    steps:
+      - action: shell
+        command: "npx wrangler deploy"
+        cwd: D:/myproject
+
+  # ===== 打开 Worker 网页 =====
+  open-worker:
+    name: "🌐 打开 Worker 网页"
+    description: "在浏览器打开 Worker URL"
+    steps:
+      - action: open_url
+        url: "https://twilight-sun-e930.czjun59.workers.dev"
+
+  # ===== 打开 WUZAPI 管理界面 =====
+  open-wuzapi:
+    name: "📱 打开 WUZAPI 管理界面"
+    description: "在浏览器打开 WUZAPI 本地地址"
+    steps:
+      - action: open_url
+        url: "http://localhost:8080"
+
+  # ===== 启动 WUZAPI + 隧道 =====
+  wuzapi-tunnel:
+    name: "💬 启动 WUZAPI + 公网隧道"
+    description: "启动 WUZAPI WhatsApp 网关 + cloudflared 隧道"
+    steps:
+      - action: shell
+        command: '.\wuzapi.exe --admintoken "wuzapi-admin-2026" --port 8080'
+        cwd: D:/myproject/wuzapi
+        background: true
+        output_as: wuzapi_proc
+
+      - action: sleep
+        seconds: 3
+
+      - action: shell
+        command: '"C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel --url http://localhost:8080'
+        background: true
+        output_as: tunnel_proc
+
+      - action: print
+        template: |
+          ✅ WUZAPI + 隧道已启动
+          📱 本地: http://localhost:8080
+          🔑 管理员 Token: wuzapi-admin-2026
+          ⏎  按 Enter 停止...
+
+      - action: wait_enter
+
+      - action: terminate
+        process: "{{wuzapi_proc}}"
+
+      - action: terminate
+        process: "{{tunnel_proc}}"
+
+      - action: print
+        template: "🛑 已停止"
+
+  # ===== 服务地址总览 =====
+  service-info:
+    name: "📡 查看所有服务地址"
+    description: "显示 Worker、WUZAPI 等地址"
+    steps:
+      - action: print
+        template: |
+          ┌──────────────────────────────────────────┐
+          │           📡 服务地址总览                    │
+          ├──────────────────────────────────────────┤
+          │  Cloudflare Worker                       │
+          │  https://twilight-sun-e930.czjun59.workers.dev
+          │                                          │
+          │  WUZAPI (本地)                            │
+          │  http://localhost:8080                   │
+          │                                          │
+          │  WUZAPI 管理员 Token                      │
+          │  wuzapi-admin-2026                       │
+          │                                          │
+          │  WUZAPI 公网隧道                          │
+          │  启动 wuzapi-tunnel 时自动生成             │
+          └──────────────────────────────────────────┘
