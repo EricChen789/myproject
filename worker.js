@@ -218,7 +218,7 @@ nav{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
 
     <div class="upload-zone" id="imgZone" onclick="document.getElementById('imgFile').click()">
       <div class="upload-icon">🖼️</div>
-      <div class="upload-hint">点击或拖拽上传图片 (.png .jpg .webp .gif)</div>
+      <div class="upload-hint">点击上传 或 直接 Ctrl+V 粘贴剪贴板图片</div>
       <input type="file" id="imgFile" accept="image/*" style="display:none" onchange="handleImage(this.files[0])">
     </div>
 
@@ -383,6 +383,23 @@ function resetImage(){
   document.getElementById('imgFile').value='';
 }
 
+// ========== CLIPBOARD PASTE (图片) ==========
+document.addEventListener('paste', e => {
+  const s = document.querySelector('#s-vision');
+  if (!s || !s.classList.contains('active')) return;  // 只在图片识别页生效
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      e.preventDefault();
+      const blob = item.getAsFile();
+      handleImage(blob);
+      toast('📋 已粘贴剪贴板图片');
+      return;
+    }
+  }
+});
+
 loadStats();loadWf();setInterval(loadStats,30000);
 </script>
 </body>
@@ -465,8 +482,8 @@ export default {
         }
 
         // 限制 25MB
-        if (file.size > 25 * 1024 * 1024) {
-          return new Response(JSON.stringify({ error: "文件太大（最大 25MB）" }), { status: 400 });
+        if (file.size > 50 * 1024 * 1024) {
+          return new Response(JSON.stringify({ error: "文件太大（最大 50MB）" }), { status: 400 });
         }
 
         const arrayBuffer = await file.arrayBuffer();
