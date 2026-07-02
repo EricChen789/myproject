@@ -110,6 +110,25 @@ nav{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
 .svc-item .dot.o{background:var(--orange);box-shadow:0 0 6px var(--orange)}
 .svc-item strong{font-size:14px}
 @media(max-width:768px){.stats-grid{grid-template-columns:1fr 1fr}.wfg{grid-template-columns:1fr}.stat-value{font-size:24px}}
+/* WhatsApp Chat */
+.wa-layout{display:flex;height:520px;gap:2px}
+.wa-contacts{width:260px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--border)}
+.wa-contact{padding:12px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.03);transition:all .2s;display:flex;align-items:center;gap:10px}
+.wa-contact:hover{background:rgba(255,255,255,0.03)}
+.wa-contact.active{background:rgba(0,229,255,0.08);border-left:3px solid var(--cyan)}
+.wa-contact-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--blue));display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;flex-shrink:0;text-transform:uppercase}
+.wa-contact-info{flex:1;min-width:0}
+.wa-contact-name{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wa-contact-preview{font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.wa-chat{flex:1;display:flex;flex-direction:column;min-width:0;background:rgba(0,0,0,0.1)}
+.wa-chat-header{padding:12px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:600;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.wa-chat-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:6px}
+.wa-msg{max-width:75%;padding:8px 14px;border-radius:12px;font-size:13px;line-height:1.5;word-break:break-word;animation:msgIn .2s ease-out}
+.wa-msg-in{align-self:flex-start;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-bottom-left-radius:4px}
+.wa-msg-out{align-self:flex-end;background:linear-gradient(135deg,rgba(0,229,255,0.2),rgba(59,130,246,0.2));border:1px solid rgba(0,229,255,0.15);border-bottom-right-radius:4px}
+.wa-msg-time{font-size:10px;color:var(--dim);margin-top:2px;text-align:right}
+.wa-empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:14px;flex-direction:column;gap:8px}
+@media(max-width:768px){.wa-layout{flex-direction:column;height:auto}.wa-contacts{width:100%;max-height:200px}.wa-chat{min-height:350px}}
 </style>
 </head>
 <body>
@@ -131,6 +150,7 @@ nav{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
   <button class="nav-btn" data-s="vision">📸 图片识别</button>
   <button class="nav-btn" data-s="workflows">⚡ 工作流</button>
   <button class="nav-btn" data-s="api">📡 API</button>
+  <button class="nav-btn" data-s="whatsapp">💬 WhatsApp</button>
 </nav>
 
 <!-- OVERVIEW -->
@@ -149,7 +169,7 @@ nav{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
       <div class="svc-item online"><span class="dot g"></span><strong>Cloudflare Worker</strong><p style="font-size:11px;color:var(--dim);margin-top:4px">API 代理 + 控制面板</p></div>
       <div class="svc-item online"><span class="dot g"></span><strong>D1 Database</strong><p style="font-size:11px;color:var(--dim);margin-top:4px">SQLite · APAC · 用量日志</p></div>
       <div class="svc-item online"><span class="dot g"></span><strong>GitHub</strong><p style="font-size:11px;color:var(--dim);margin-top:4px">EricChen789/myproject</p></div>
-      <div class="svc-item offline"><span class="dot o"></span><strong>WUZAPI</strong><p style="font-size:11px;color:var(--dim);margin-top:4px">本地 :8080 · 需手动启动</p></div>
+      <div class="svc-item offline" id="wuzaStatus"><span class="dot o" id="wuzaDot"></span><strong>WUZAPI</strong><p style="font-size:11px;color:var(--dim);margin-top:4px" id="wuzaLabel">本地 :8080 · 需手动启动</p></div>
     </div>
   </div>
 
@@ -261,6 +281,81 @@ nav{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
 </div>
 </div>
 
+<!-- WHATSAPP -->
+<div class="section" id="s-whatsapp">
+  <!-- 未登录区域 -->
+  <div id="waLoginBox">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px">
+      <div><h3 style="font-size:16px;margin-bottom:2px">💬 WhatsApp 扫码登录</h3>
+      <p style="font-size:12px;color:var(--dim)">通过 WUZAPI 连接 WhatsApp，扫码后即可收发消息</p></div>
+      <span id="waBadge" style="font-size:11px;padding:4px 10px;border-radius:20px;background:rgba(239,68,68,0.2);color:var(--red);border:1px solid var(--red)">未连接</span>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+      <input id="wuzaUrl" placeholder="WUZAPI 地址 (例: https://xxx.trycloudflare.com)" style="flex:1;min-width:200px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text);font-size:13px;font-family:inherit" onchange="saveWuzaUrl()">
+      <input id="wuzaToken" placeholder="用户 Token (main-user-token-2026)" value="main-user-token-2026" style="width:200px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text);font-size:13px;font-family:inherit" onchange="saveWuzaToken()">
+      <span style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" id="waConnectBtn" onclick="waConnect()">🔗 连接</button>
+        <button class="btn btn-outline btn-sm" id="waDCBtn" onclick="waDisconnect()" style="display:none">⏸ 断开</button>
+        <button class="btn btn-outline btn-sm" id="waLogoutBtn" onclick="waLogout()" style="display:none;color:var(--red);border-color:var(--red)">🚪 登出</button>
+      </span>
+    </div>
+
+    <div id="waProgress" style="display:none;text-align:center;padding:20px"><span class="spinner"></span> <span id="waProgressText" style="margin-left:8px;font-size:13px;color:var(--dim)">连接中...</span></div>
+
+    <div id="waQRBox" style="display:none;text-align:center;padding:20px">
+      <div style="display:inline-block;padding:16px;background:#fff;border-radius:12px;margin-bottom:12px">
+        <img id="waQRImg" style="width:256px;height:256px;display:block" alt="QR Code">
+      </div>
+      <p style="font-size:13px;color:var(--dim)">📱 打开 WhatsApp → 设置 → 已关联设备 → 关联设备<br>扫描上方二维码</p>
+    </div>
+
+    <p id="waError" style="display:none;color:var(--red);margin-top:12px;font-size:13px"></p>
+  </div>
+  </div>
+
+  <!-- 已登录聊天区域 -->
+  <div id="waChatBox" style="display:none">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span id="waChatBadge" style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--green)"><span style="width:8px;height:8px;background:var(--green);border-radius:50%"></span>已登录</span>
+          <span id="waChatPhone" style="font-size:11px;color:var(--dim)"></span>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="waLogout()" style="color:var(--red);border-color:var(--red)">🚪 登出</button>
+      </div>
+      <div class="wa-layout">
+        <div class="wa-contacts" id="waContacts">
+          <div style="padding:10px 12px;border-bottom:1px solid var(--border)">
+            <input id="waNewPhone" placeholder="+852 手机号... 回车发消息" style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:rgba(0,0,0,.3);color:var(--text);font-size:12px;font-family:inherit;outline:none"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();waNewChat()}">
+          </div>
+          <div style="padding:16px;text-align:center;color:var(--dim);font-size:13px" id="waContactsLoading"><span class="spinner"></span> 加载联系人...</div>
+          <div id="waContactItems"></div>
+        </div>
+        <div class="wa-chat" id="waChatPanel">
+          <div class="wa-empty" id="waEmpty">
+            <div style="font-size:48px">💬</div>
+            <div>选择一个联系人开始聊天</div>
+          </div>
+          <div class="wa-chat-header" id="waChatHeader" style="display:none">
+            <div class="wa-contact-avatar" id="waChatAvatar" style="width:32px;height:32px;font-size:12px"></div>
+            <span id="waChatName"></span>
+          </div>
+          <div class="wa-chat-msgs" id="waChatMsgs" style="display:none"></div>
+          <div class="chat-bar" id="waChatBar" style="display:none">
+            <textarea id="waMsgIn" placeholder="输入消息... (Enter 发送)" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();waSendMsg()}"></textarea>
+            <button class="btn btn-primary btn-sm" onclick="waSendMsg()" id="waSendBtn">发送</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
 <div id="toast" class="toast" style="display:none"></div>
 
 <script>
@@ -269,7 +364,17 @@ document.getElementById('u').textContent = location.origin;
 let lastEnglish = '';
 
 // ========== TABS ==========
-function st(name){document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.s===name));document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id==='s-'+name))}
+function st(name){
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.s===name));
+  document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id==='s-'+name));
+  // WhatsApp poll management
+  if (name !== 'whatsapp' && waMsgPollTimer) {
+    clearInterval(waMsgPollTimer); waMsgPollTimer = null;
+  }
+  if (name === 'whatsapp' && waActiveJid && !waMsgPollTimer) {
+    waMsgPollTimer = setInterval(() => waLoadMessages(waActiveJid, true), 3000);
+  }
+}
 document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>st(b.dataset.s)));
 
 // ========== TOAST ==========
@@ -403,6 +508,402 @@ document.addEventListener('paste', e => {
 });
 
 loadStats();loadWf();setInterval(loadStats,30000);
+
+// ========== WHATSAPP ==========
+let waPollTimer = null;
+let waPollCount = 0;
+const WA_POLL_MAX = 60;
+
+// Chat state
+let waContactsData = {};
+let waActiveJid = null;
+let waActiveName = '';
+let waMyJid = '';
+let waMsgPollTimer = null;
+let waChatMessages = {};
+
+function getWuzaUrl() {
+  return document.getElementById('wuzaUrl').value.trim();
+}
+function getWuzaToken() {
+  return document.getElementById('wuzaToken').value.trim();
+}
+function saveWuzaUrl() {
+  try { localStorage.setItem('wuza_url', getWuzaUrl()); } catch(e) {}
+}
+function saveWuzaToken() {
+  try { localStorage.setItem('wuza_token', getWuzaToken()); } catch(e) {}
+}
+// 页面加载恢复
+(function() {
+  try {
+    const savedUrl = localStorage.getItem('wuza_url');
+    if (savedUrl) document.getElementById('wuzaUrl').value = savedUrl;
+    const savedToken = localStorage.getItem('wuza_token');
+    if (savedToken) document.getElementById('wuzaToken').value = savedToken;
+    if (savedUrl) checkWuzaStatus();
+  } catch(e) {}
+})();
+
+async function wuzaProxy(path, method, body, query) {
+  const baseUrl = getWuzaUrl();
+  if (!baseUrl) throw new Error('请先输入 WUZAPI 地址');
+  const token = getWuzaToken();
+  if (!token) throw new Error('请先输入 WUZAPI Token');
+  const resp = await fetch('/wuzapi/proxy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ baseUrl, path, method, body, token, query })
+  });
+  const data = await resp.json();
+  if (!data.success && data.error) throw new Error(data.error);
+  return data;
+}
+
+async function checkWuzaStatus() {
+  try {
+    const d = await wuzaProxy('/session/status', 'GET');
+    updateWaUI(d.data || d);
+  } catch(e) {
+    // WUZAPI 不可达，忽略
+  }
+}
+
+function updateWaUI(status) {
+  const badge = document.getElementById('waBadge');
+  const connectBtn = document.getElementById('waConnectBtn');
+  const dcBtn = document.getElementById('waDCBtn');
+  const logoutBtn = document.getElementById('waLogoutBtn');
+  const loginBox = document.getElementById('waLoginBox');
+  const chatBox = document.getElementById('waChatBox');
+  const qrBox = document.getElementById('waQRBox');
+  const progress = document.getElementById('waProgress');
+  const wuzaStatus = document.getElementById('wuzaStatus');
+  const wuzaDot = document.getElementById('wuzaDot');
+  const wuzaLabel = document.getElementById('wuzaLabel');
+
+  const connected = status.connected;
+  const loggedIn = status.loggedIn;
+
+  // Update overview WUZAPI status
+  if (wuzaStatus) {
+    if (connected) {
+      wuzaStatus.className = 'svc-item online';
+      if (wuzaDot) wuzaDot.className = 'dot g';
+      if (wuzaLabel) wuzaLabel.textContent = 'WhatsApp ' + (loggedIn ? '已登录' : '等待扫码');
+    } else {
+      wuzaStatus.className = 'svc-item offline';
+      if (wuzaDot) wuzaDot.className = 'dot o';
+      if (wuzaLabel) wuzaLabel.textContent = '本地 :8080 · 需手动启动';
+    }
+  }
+
+  if (loggedIn) {
+    badge.innerHTML = '<span style="color:var(--green)">●</span> 已登录';
+    badge.style.background = 'rgba(34,197,94,0.15)';
+    badge.style.color = 'var(--green)';
+    badge.style.borderColor = 'var(--green)';
+    connectBtn.style.display = 'none';
+    dcBtn.style.display = '';
+    logoutBtn.style.display = '';
+    qrBox.style.display = 'none';
+    progress.style.display = 'none';
+    if (waPollTimer) { clearTimeout(waPollTimer); waPollTimer = null; }
+    // Show chat interface
+    loginBox.style.display = 'none';
+    chatBox.style.display = '';
+    waMyJid = status.jid || '';
+    document.getElementById('waChatPhone').textContent = status.jid || '';
+    waLoadContacts();
+  } else if (connected) {
+    badge.innerHTML = '<span style="color:var(--orange)">●</span> 等待扫码';
+    badge.style.background = 'rgba(245,158,11,0.15)';
+    badge.style.color = 'var(--orange)';
+    badge.style.borderColor = 'var(--orange)';
+    connectBtn.style.display = 'none';
+    dcBtn.style.display = '';
+    logoutBtn.style.display = 'none';
+    chatBox.style.display = 'none';
+    loginBox.style.display = '';
+  } else {
+    badge.innerHTML = '未连接';
+    badge.style.background = 'rgba(239,68,68,0.2)';
+    badge.style.color = 'var(--red)';
+    badge.style.borderColor = 'var(--red)';
+    connectBtn.style.display = '';
+    dcBtn.style.display = 'none';
+    logoutBtn.style.display = 'none';
+    qrBox.style.display = 'none';
+    progress.style.display = 'none';
+    chatBox.style.display = 'none';
+    loginBox.style.display = '';
+    waStopPoll();
+  }
+}
+
+async function waConnect() {
+  const err = document.getElementById('waError');
+  err.style.display = 'none';
+  const progress = document.getElementById('waProgress');
+  const progressText = document.getElementById('waProgressText');
+  const qrBox = document.getElementById('waQRBox');
+  qrBox.style.display = 'none';
+
+  try {
+    progressText.textContent = '正在连接 WUZAPI...';
+    progress.style.display = 'block';
+    await wuzaProxy('/session/connect', 'POST', { Subscribe: [], Immediate: true });
+    progressText.textContent = '正在获取二维码...';
+    await new Promise(r => setTimeout(r, 2000));
+    waPollCount = 0;
+    waPollQR();
+  } catch(e) {
+    progress.style.display = 'none';
+    err.textContent = '❌ ' + e.message;
+    err.style.display = 'block';
+  }
+}
+
+async function waPollQR() {
+  const err = document.getElementById('waError');
+  const progress = document.getElementById('waProgress');
+  const progressText = document.getElementById('waProgressText');
+  const qrBox = document.getElementById('waQRBox');
+  const qrImg = document.getElementById('waQRImg');
+
+  waPollCount++;
+  if (waPollCount > WA_POLL_MAX) {
+    progress.style.display = 'none';
+    qrBox.style.display = 'none';
+    err.textContent = '❌ 扫码超时（已等待 2 分钟），请重新连接';
+    err.style.display = 'block';
+    updateWaUI({ connected: false, loggedIn: false });
+    waPollTimer = null;
+    return;
+  }
+
+  try {
+    const d = await wuzaProxy('/session/status', 'GET');
+    const status = d.data || d;
+    updateWaUI(status);
+
+    if (status.loggedIn) {
+      progress.style.display = 'none';
+      qrBox.style.display = 'none';
+      toast('✅ WhatsApp 已登录！');
+      return;
+    }
+
+    if (status.qrcode) {
+      progress.style.display = 'none';
+      qrImg.src = status.qrcode;
+      qrBox.style.display = 'block';
+      progressText.textContent = '等待扫码...';
+      progress.style.display = 'block';
+    } else if (status.connected) {
+      progressText.textContent = '等待二维码生成...';
+      progress.style.display = 'block';
+    }
+
+    // 继续轮询
+    waPollTimer = setTimeout(waPollQR, 2000);
+  } catch(e) {
+    progress.style.display = 'none';
+    err.textContent = '❌ ' + e.message;
+    err.style.display = 'block';
+    updateWaUI({ connected: false, loggedIn: false });
+  }
+}
+
+async function waDisconnect() {
+  try {
+    if (waPollTimer) { clearTimeout(waPollTimer); waPollTimer = null; }
+    await wuzaProxy('/session/disconnect', 'POST');
+    updateWaUI({ connected: false, loggedIn: false });
+    toast('WhatsApp 已断开');
+  } catch(e) {
+    toast('断开失败: ' + e.message, 'err');
+  }
+}
+
+async function waLogout() {
+  if (!confirm('确定登出？下次连接需要重新扫码。')) return;
+  try {
+    if (waPollTimer) { clearTimeout(waPollTimer); waPollTimer = null; }
+    waStopPoll();
+    await wuzaProxy('/session/logout', 'POST');
+    updateWaUI({ connected: false, loggedIn: false });
+    toast('已登出，下次连接需重新扫码');
+  } catch(e) {
+    toast('登出失败: ' + e.message, 'err');
+  }
+}
+
+// ========== CONTACTS ==========
+async function waLoadContacts() {
+  try {
+    const d = await wuzaProxy('/user/contacts', 'GET');
+    waContactsData = d.data || d;
+    document.getElementById('waContactsLoading').style.display = 'none';
+    waRenderContactList();
+  } catch(e) {
+    document.getElementById('waContactItems').innerHTML =
+      '<div style="padding:20px;text-align:center;color:var(--red);font-size:12px">加载失败: '+escapeHtml(e.message)+'</div>';
+  }
+}
+
+function waRenderContactList(filter) {
+  const list = document.getElementById('waContactItems');
+  const entries = Object.entries(waContactsData);
+  const f = (filter || '').toLowerCase();
+
+  let filtered = entries.filter(([jid, info]) => {
+    if (!f) return true;
+    const name = (info.PushName || info.BusinessName || jid).toLowerCase();
+    return name.includes(f);
+  });
+
+  filtered.sort((a, b) => {
+    const na = a[1].PushName || a[1].BusinessName || a[0];
+    const nb = b[1].PushName || b[1].BusinessName || b[0];
+    return na.localeCompare(nb);
+  });
+
+  list.innerHTML = filtered.map(([jid, info]) => {
+    const name = info.PushName || info.BusinessName || jid.split('@')[0];
+    const initial = (name || '?')[0].toUpperCase();
+    const escName = name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const escJid = jid.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    return '<div class="wa-contact'+(waActiveJid===jid?' active':'')+'" data-jid="'+escJid+'" data-name="'+escName+'" onclick="waOpenChat(this.dataset.jid,this.dataset.name)">'+
+      '<div class="wa-contact-avatar">'+initial+'</div>'+
+      '<div class="wa-contact-info">'+
+        '<div class="wa-contact-name">'+escapeHtml(name)+'</div>'+
+        '<div class="wa-contact-preview">'+escapeHtml(jid.split('@')[0])+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join('') || '<div style="padding:20px;text-align:center;color:var(--dim);font-size:12px">暂无联系人</div>';
+}
+
+// ========== NEW CHAT ==========
+async function waNewChat() {
+  const input = document.getElementById('waNewPhone');
+  const phone = input.value.trim().replace(/\s+/g,'').replace('+','');
+  if (!phone) return;
+  // Try to construct JID — WUZAPI usually uses phone@s.whatsapp.net
+  const jid = phone + '@s.whatsapp.net';
+  const name = '+' + phone;
+  input.value = '';
+  waOpenChat(jid, name);
+}
+
+function waFilterContacts() {
+  const f = document.getElementById('waNewPhone').value;
+  waRenderContactList(f);
+}
+
+// ========== CHAT ==========
+async function waOpenChat(jid, name) {
+  waActiveJid = jid;
+  waActiveName = name;
+  waChatMessages[jid] = waChatMessages[jid] || [];
+
+  // Update sidebar
+  waRenderContactList();
+
+  // Show chat panel
+  document.getElementById('waEmpty').style.display = 'none';
+  document.getElementById('waChatHeader').style.display = 'flex';
+  document.getElementById('waChatName').textContent = name;
+  document.getElementById('waChatAvatar').textContent = (name||'?')[0].toUpperCase();
+  document.getElementById('waChatMsgs').style.display = 'flex';
+  document.getElementById('waChatBar').style.display = 'flex';
+
+  // Load messages
+  await waLoadMessages(jid);
+
+  // Start polling
+  if (waMsgPollTimer) clearInterval(waMsgPollTimer);
+  waMsgPollTimer = setInterval(() => waLoadMessages(jid, true), 3000);
+}
+
+async function waLoadMessages(jid, silent) {
+  try {
+    const d = await wuzaProxy('/chat/history', 'GET', null, 'chat_jid='+encodeURIComponent(jid)+'&limit=50');
+    const msgs = Array.isArray(d) ? d : (d.data || []);
+    // Reverse: API returns newest first
+    msgs.reverse();
+    waChatMessages[jid] = msgs;
+    waRenderMessages(jid);
+  } catch(e) {
+    if (!silent) {
+      document.getElementById('waChatMsgs').innerHTML =
+        '<div class="chat-msg msg-sys">❌ 无法加载消息: '+escapeHtml(e.message)+'</div>';
+    }
+  }
+}
+
+function waRenderMessages(jid) {
+  const container = document.getElementById('waChatMsgs');
+  const msgs = waChatMessages[jid] || [];
+  const ownJid = waMyJid || '';
+
+  container.innerHTML = msgs.map(m => {
+    // Determine direction: sent vs received
+    const isOut = m.sender_jid === 'me' ||
+                  (ownJid && m.sender_jid && m.sender_jid === ownJid) ||
+                  (ownJid && m.sender_jid && m.sender_jid.includes(ownJid.replace(/@.*/, '')));
+    const cls = isOut ? 'wa-msg-out' : 'wa-msg-in';
+    const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) : '';
+    let body = escapeHtml(m.text_content || m.body || '');
+
+    if (m.message_type === 'image' || m.message_type === 'video' || m.message_type === 'sticker')
+      body = '['+m.message_type.toUpperCase()+'] '+(body||'');
+    else if (m.message_type === 'audio')
+      body = '🎤 [语音消息]';
+    else if (m.message_type === 'document')
+      body = '📎 [文件] '+(body||'');
+
+    return '<div class="wa-msg '+cls+'">'+
+      '<div>'+body+'</div>'+
+      '<div class="wa-msg-time">'+time+'</div>'+
+    '</div>';
+  }).join('') || '<div style="text-align:center;color:var(--dim);padding:20px;font-size:12px">暂无消息</div>';
+
+  container.scrollTop = container.scrollHeight;
+}
+
+async function waSendMsg() {
+  const input = document.getElementById('waMsgIn');
+  const text = input.value.trim();
+  if (!text || !waActiveJid) return;
+
+  const phone = waActiveJid.split('@')[0];
+  const btn = document.getElementById('waSendBtn');
+  btn.disabled = true; btn.textContent = '...';
+
+  try {
+    await wuzaProxy('/chat/send/text', 'POST', { Phone: phone, Body: text });
+    input.value = '';
+    await waLoadMessages(waActiveJid);
+  } catch(e) {
+    toast('发送失败: '+e.message, 'err');
+  }
+  btn.disabled = false; btn.textContent = '发送';
+}
+
+function waStopPoll() {
+  if (waMsgPollTimer) { clearInterval(waMsgPollTimer); waMsgPollTimer = null; }
+  waActiveJid = null;
+  waActiveName = '';
+  waContactsData = {};
+  waChatMessages = {};
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
 </script>
 </body>
 </html>`;
@@ -484,6 +985,42 @@ export default {
         });
       } catch (e) {
         return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+      }
+    }
+
+    // ===== WUZAPI 代理 =====
+    if (path === "/wuzapi/proxy" && method === "POST") {
+      try {
+        const { baseUrl, path: wuzaPath, method: wuzaMethod, body, token, query } = await request.json();
+
+        // 安全限制：只允许代理 WUZAPI session/chat/user 相关路径
+        const allowed = wuzaPath && (wuzaPath.startsWith('/session/') || wuzaPath.startsWith('/chat/') || wuzaPath.startsWith('/user/'));
+        if (!allowed) {
+          return new Response(JSON.stringify({ error: "不允许的路径" }), {
+            status: 403,
+            headers: { "Access-Control-Allow-Origin": "*" }
+          });
+        }
+
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["token"] = token;
+
+        const fullUrl = query ? `${baseUrl}${wuzaPath}?${query}` : `${baseUrl}${wuzaPath}`;
+        const wuzaResp = await fetch(fullUrl, {
+          method: wuzaMethod || 'GET',
+          headers,
+          body: body ? JSON.stringify(body) : undefined
+        });
+
+        const data = await wuzaResp.json();
+        return new Response(JSON.stringify(data), {
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message, success: false }), {
+          status: 500,
+          headers: { "Access-Control-Allow-Origin": "*" }
+        });
       }
     }
 
