@@ -4,3 +4,9 @@ compatibility_date = "2026-07-01"
 
 # 默认路由：workers.dev 子域名
 workers_dev = true
+
+# D1 数据库
+[[d1_databases]]
+binding = "myproject_db"
+database_name = "myproject-db"
+database_id = "ea161d6c-ddf1-4e4d-97dd-5f1d76048fb9"

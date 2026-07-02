@@ -190,8 +190,11 @@ workflows:
           ┌──────────────────────────────────────────┐
           │           📡 服务地址总览                    │
           ├──────────────────────────────────────────┤
-          │  Cloudflare Worker                       │
-          │  https://twilight-sun-e930.czjun59.workers.dev
+          │  🖥️  控制面板 (NEW)                       │
+          │  https://twilight-sun-e930.czijun59.workers.dev
+          │                                          │
+          │  Cloudflare Worker API                   │
+          │  POST /v1/chat/completions               │
           │                                          │
           │  WUZAPI (本地)                            │
           │  http://localhost:8080                   │
@@ -199,6 +202,6 @@ workflows:
           │  WUZAPI 管理员 Token                      │
           │  wuzapi-admin-2026                       │
           │                                          │
-          │  WUZAPI 公网隧道                          │
-          │  启动 wuzapi-tunnel 时自动生成             │
+          │  GitHub                                  │
+          │  https://github.com/EricChen789/myproject│
           └──────────────────────────────────────────┘
